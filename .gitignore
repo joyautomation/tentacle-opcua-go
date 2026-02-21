@@ -1,0 +1,10 @@
+# Build output
+tentacle-opcua-go
+tentacle-opcua-go.exe
+dist/
+
+# PKI / certificates (generated at runtime)
+pki/
+
+# Go
+*.test
