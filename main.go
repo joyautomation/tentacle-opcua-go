@@ -182,6 +182,51 @@ func main() {
 		os.Exit(1)
 	}
 
+	// ═══════════════════════════════════════════════════════════════════════════
+	// Service enabled/disabled state
+	// ═══════════════════════════════════════════════════════════════════════════
+
+	enabledKv, err := js.CreateOrUpdateKeyValue(ctx, jetstream.KeyValueConfig{
+		Bucket:  "service_enabled",
+		History: 1,
+		TTL:     0, // No expiration
+	})
+	if err != nil {
+		logError("opcua", "Failed to create/open service_enabled KV: %v", err)
+		os.Exit(1)
+	}
+
+	// Check initial enabled state
+	if entry, err := enabledKv.Get(ctx, moduleID); err == nil {
+		var state ServiceEnabledKV
+		if json.Unmarshal(entry.Value(), &state) == nil {
+			scanner.SetEnabled(state.Enabled)
+			logInfo("opcua", "Initial enabled state: %v", state.Enabled)
+		}
+	}
+
+	// Watch for enabled state changes
+	enabledWatcher, err := enabledKv.Watch(ctx, moduleID)
+	if err != nil {
+		logWarn("opcua", "Failed to watch service_enabled KV: %v", err)
+	} else {
+		go func() {
+			for entry := range enabledWatcher.Updates() {
+				if entry == nil {
+					continue
+				}
+				if entry.Operation() == jetstream.KeyValueDelete || entry.Operation() == jetstream.KeyValuePurge {
+					scanner.SetEnabled(true) // deleted = default to enabled
+					continue
+				}
+				var state ServiceEnabledKV
+				if json.Unmarshal(entry.Value(), &state) == nil {
+					scanner.SetEnabled(state.Enabled)
+				}
+			}
+		}()
+	}
+
 	startedAt := time.Now().UnixMilli()
 
 	publishHeartbeat := func() {
@@ -190,7 +235,9 @@ func main() {
 			ModuleID:    moduleID,
 			LastSeen:    time.Now().UnixMilli(),
 			StartedAt:   startedAt,
-			Metadata:    map[string]interface{}{},
+			Metadata: map[string]interface{}{
+				"enabled": scanner.IsEnabled(),
+			},
 		}
 		data, err := json.Marshal(hb)
 		if err != nil {
@@ -226,8 +273,11 @@ func main() {
 	shutdown := func(reason string) {
 		logInfo("opcua", "Received %s, shutting down...", reason)
 
-		// Stop heartbeat
+		// Stop heartbeat and watchers
 		heartbeatTicker.Stop()
+		if enabledWatcher != nil {
+			_ = enabledWatcher.Stop()
+		}
 		if err := kv.Delete(ctx, moduleID); err != nil {
 			// Ignore — may already be expired
 		}

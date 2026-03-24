@@ -8,6 +8,7 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/gopcua/opcua"
@@ -50,13 +51,14 @@ type Scanner struct {
 	keyFile         string
 	pkiDir          string
 	autoAcceptCerts bool
+	enabled         atomic.Bool // whether the scanner is enabled (actively publishing)
 	mu              sync.RWMutex
 	subs            []*nats.Subscription
 }
 
 // NewScanner creates a new scanner instance.
 func NewScanner(nc *nats.Conn, certFile, keyFile, pkiDir string, autoAcceptCerts bool) *Scanner {
-	return &Scanner{
+	s := &Scanner{
 		nc:              nc,
 		connections:     make(map[string]*OpcUaConnection),
 		subscribers:     make(map[string]map[string]*DeviceSubscription),
@@ -64,6 +66,26 @@ func NewScanner(nc *nats.Conn, certFile, keyFile, pkiDir string, autoAcceptCerts
 		keyFile:         keyFile,
 		pkiDir:          pkiDir,
 		autoAcceptCerts: autoAcceptCerts,
+	}
+	s.enabled.Store(true) // enabled by default
+	return s
+}
+
+// IsEnabled returns whether the scanner is enabled.
+func (s *Scanner) IsEnabled() bool {
+	return s.enabled.Load()
+}
+
+// SetEnabled enables or disables the scanner.
+// When disabled, data change callbacks skip publishing but connections are preserved.
+func (s *Scanner) SetEnabled(enabled bool) {
+	was := s.enabled.Swap(enabled)
+	if was != enabled {
+		if enabled {
+			logInfo("opcua", "Scanner ENABLED — resuming publishing")
+		} else {
+			logInfo("opcua", "Scanner DISABLED — pausing publishing (connections preserved)")
+		}
 	}
 }
 
@@ -421,6 +443,17 @@ func (s *Scanner) removeSubscriber(deviceID, subscriberID string, nodeIDs []stri
 
 func (s *Scanner) publishValue(conn *OpcUaConnection, nodeID string, value interface{}, datatype, quality string) {
 	if value == nil {
+		return
+	}
+
+	// Skip publishing when disabled — still update cached values
+	if !s.enabled.Load() {
+		now := time.Now().UnixMilli()
+		if cached, ok := conn.Variables[nodeID]; ok {
+			cached.Value = value
+			cached.Quality = quality
+			cached.LastUpdated = now
+		}
 		return
 	}
 
