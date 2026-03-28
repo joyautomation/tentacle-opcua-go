@@ -251,6 +251,12 @@ func extractValue(v *ua.Variant) interface{} {
 	}
 }
 
+// sanitizeDeviceIdForSubject replaces spaces and NATS-invalid characters in a device ID.
+func sanitizeDeviceIdForSubject(id string) string {
+	r := strings.NewReplacer(" ", "_", ".", "_", "*", "_", ">", "_")
+	return r.Replace(id)
+}
+
 // sanitizeNodeIDForSubject converts a NodeId string to a valid NATS subject segment.
 // "ns=2;s=MyTag.SubTag" → "ns_2_s_MyTag_SubTag"
 func sanitizeNodeIDForSubject(nodeID string) string {

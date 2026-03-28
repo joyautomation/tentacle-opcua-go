@@ -488,7 +488,7 @@ func (s *Scanner) publishValue(conn *OpcUaConnection, nodeID string, value inter
 	}
 
 	sanitizedNodeID := sanitizeNodeIDForSubject(nodeID)
-	subject := fmt.Sprintf("%s.data.%s.%s", moduleID, conn.DeviceID, sanitizedNodeID)
+	subject := fmt.Sprintf("%s.data.%s.%s", moduleID, sanitizeDeviceIdForSubject(conn.DeviceID), sanitizedNodeID)
 	_ = s.nc.Publish(subject, data)
 }
 
