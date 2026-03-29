@@ -11,6 +11,7 @@ import (
 	"sync/atomic"
 	"time"
 
+	common "github.com/joyautomation/tentacle-go-common"
 	"github.com/gopcua/opcua"
 	"github.com/gopcua/opcua/monitor"
 	"github.com/gopcua/opcua/ua"
@@ -471,7 +472,7 @@ func (s *Scanner) publishValue(conn *OpcUaConnection, nodeID string, value inter
 		description = cached.DisplayName
 	}
 
-	msg := PlcDataMessage{
+	msg := common.PlcDataMessage{
 		ModuleID:    moduleID,
 		DeviceID:    conn.DeviceID,
 		VariableID:  nodeID,
@@ -488,12 +489,12 @@ func (s *Scanner) publishValue(conn *OpcUaConnection, nodeID string, value inter
 	}
 
 	sanitizedNodeID := sanitizeNodeIDForSubject(nodeID)
-	subject := fmt.Sprintf("%s.data.%s.%s", moduleID, sanitizeDeviceIdForSubject(conn.DeviceID), sanitizedNodeID)
+	subject := fmt.Sprintf("%s.data.%s.%s", moduleID, common.SanitizeDeviceIDForSubject(conn.DeviceID), sanitizedNodeID)
 	_ = s.nc.Publish(subject, data)
 }
 
 func (s *Scanner) publishBrowseProgress(browseID, deviceID, phase string, totalTags, completedTags, errorCount int, message string) {
-	msg := BrowseProgressMessage{
+	msg := common.BrowseProgressMessage{
 		BrowseID:      browseID,
 		ModuleID:      moduleID,
 		DeviceID:      deviceID,

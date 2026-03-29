@@ -58,62 +58,6 @@ type UnsubscribeRequest struct {
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
-// Published message types
-// ═══════════════════════════════════════════════════════════════════════════
-
-// PlcDataMessage is published on opcua.data.{deviceId}.{sanitizedNodeId}
-// when a monitored variable changes value.
-type PlcDataMessage struct {
-	ModuleID    string      `json:"moduleId"`
-	DeviceID    string      `json:"deviceId"`
-	VariableID  string      `json:"variableId"`
-	Value       interface{} `json:"value"`
-	Timestamp   int64       `json:"timestamp"`
-	Datatype    string      `json:"datatype"`
-	Description string      `json:"description,omitempty"`
-}
-
-// ServiceHeartbeat is published every 10s to the service_heartbeats KV bucket.
-type ServiceHeartbeat struct {
-	ServiceType string                 `json:"serviceType"`
-	ModuleID    string                 `json:"moduleId"`
-	LastSeen    int64                  `json:"lastSeen"`
-	StartedAt   int64                  `json:"startedAt"`
-	Metadata    map[string]interface{} `json:"metadata,omitempty"`
-}
-
-// ServiceEnabledKV is the value stored in the service_enabled KV bucket.
-type ServiceEnabledKV struct {
-	ModuleID  string `json:"moduleId"`
-	Enabled   bool   `json:"enabled"`
-	UpdatedAt int64  `json:"updatedAt"`
-}
-
-// BrowseProgressMessage is published during async browse operations
-// to opcua.browse.progress.{browseId}.
-type BrowseProgressMessage struct {
-	BrowseID      string `json:"browseId"`
-	ModuleID      string `json:"moduleId"`
-	DeviceID      string `json:"deviceId"`
-	Phase         string `json:"phase"` // "discovering", "expanding", "reading", "caching", "completed", "failed"
-	TotalTags     int    `json:"totalTags"`
-	CompletedTags int    `json:"completedTags"`
-	ErrorCount    int    `json:"errorCount"`
-	Message       string `json:"message,omitempty"`
-	Timestamp     int64  `json:"timestamp"`
-}
-
-// ServiceLogEntry is published to service.logs.opcua.opcua for log streaming.
-type ServiceLogEntry struct {
-	Timestamp   int64  `json:"timestamp"`
-	Level       string `json:"level"`
-	Message     string `json:"message"`
-	ServiceType string `json:"serviceType"`
-	ModuleID    string `json:"moduleId"`
-	Logger      string `json:"logger,omitempty"`
-}
-
-// ═══════════════════════════════════════════════════════════════════════════
 // Variable info (returned by browse and variables requests)
 // ═══════════════════════════════════════════════════════════════════════════
 
@@ -249,12 +193,6 @@ func extractValue(v *ua.Variant) interface{} {
 	default:
 		return fmt.Sprintf("%v", tv)
 	}
-}
-
-// sanitizeDeviceIdForSubject replaces spaces and NATS-invalid characters in a device ID.
-func sanitizeDeviceIdForSubject(id string) string {
-	r := strings.NewReplacer(" ", "_", ".", "_", "*", "_", ">", "_")
-	return r.Replace(id)
 }
 
 // sanitizeNodeIDForSubject converts a NodeId string to a valid NATS subject segment.
